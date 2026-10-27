@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { questionnaire } from "@/lib/questionnaire";
+import { intelligenceQuestionnaire, questionnaire, type Questionnaire } from "@/lib/questionnaire";
 
-type View = "welcome" | "library" | "quiz" | "results" | "admin";
+type View = "welcome" | "lesson-builder" | "self-menu" | "pedagogy" | "library" | "quiz" | "results" | "admin";
 type Result = { dimensionId: string; score: number; band: string };
 
 export default function Home() {
@@ -12,10 +12,11 @@ export default function Home() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [results, setResults] = useState<Result[]>([]);
   const [error, setError] = useState("");
+  const [activeQuestionnaire, setActiveQuestionnaire] = useState<Questionnaire>(questionnaire);
 
-  const question = questionnaire.questions[step];
+  const question = activeQuestionnaire.questions[step];
   const answeredCount = Object.keys(answers).length;
-  const activeSection = useMemo(() => questionnaire.sections.find((section) => section.id === question?.sectionId), [question]);
+  const activeSection = useMemo(() => activeQuestionnaire.sections.find((section) => section.id === question?.sectionId), [activeQuestionnaire, question]);
 
   function begin() {
     setView("library");
@@ -32,14 +33,14 @@ export default function Home() {
       setError("כדאי לבחור תשובה כדי להמשיך");
       return;
     }
-    if (step < questionnaire.questions.length - 1) setStep((current) => current + 1);
+    if (step < activeQuestionnaire.questions.length - 1) setStep((current) => current + 1);
     else submit();
   }
 
   async function submit() {
     setView("results");
     setError("");
-    const response = await fetch("/api/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers }) });
+    const response = await fetch("/api/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers, questionnaireId: activeQuestionnaire.id }) });
     const data = (await response.json()) as { results?: Result[]; error?: string };
     if (!response.ok || !data.results) {
       setError(data.error ?? "לא הצלחנו לחשב את התוצאה.");
@@ -55,6 +56,7 @@ export default function Home() {
     setAnswers({});
     setResults([]);
     setError("");
+    setActiveQuestionnaire(questionnaire);
   }
 
   return (
@@ -70,27 +72,45 @@ export default function Home() {
         </div>
       </header>
 
-      {view === "welcome" && <WelcomeScreen onStart={begin} onAdmin={() => setView("admin")} />}
-      {view === "library" && <LibraryScreen onStart={() => { setStep(0); setView("quiz"); }} />}
-      {view === "quiz" && <QuizScreen question={question} step={step} total={questionnaire.questions.length} activeSection={activeSection?.title ?? ""} answer={answers[question.id]} error={error} onChoose={choose} onNext={next} />}
-      {view === "results" && <ResultsScreen results={results} onReset={reset} />}
+      {view === "welcome" && <WelcomeScreen onBuildLesson={() => setView("lesson-builder")} onBuildSelf={() => setView("self-menu")} onAdmin={() => setView("admin")} />}
+      {view === "lesson-builder" && <LessonBuilderScreen onBack={() => setView("welcome")} />}
+      {view === "self-menu" && <SelfMenuScreen onBack={() => setView("welcome")} onTeacherQuiz={() => { setActiveQuestionnaire(questionnaire); setAnswers({}); setStep(0); setView("quiz"); }} onPedagogy={() => setView("pedagogy")} />}
+      {view === "pedagogy" && <PedagogyScreen onBack={() => setView("self-menu")} onStart={() => { setActiveQuestionnaire(intelligenceQuestionnaire); setAnswers({}); setStep(0); setView("quiz"); }} />}
+      {view === "library" && <LibraryScreen onStart={() => { setActiveQuestionnaire(questionnaire); setAnswers({}); setStep(0); setView("quiz"); }} />}
+      {view === "quiz" && <QuizScreen question={question} step={step} total={activeQuestionnaire.questions.length} activeSection={activeSection?.title ?? ""} answer={answers[question.id]} error={error} onChoose={choose} onNext={next} />}
+      {view === "results" && <ResultsScreen results={results} activeQuestionnaire={activeQuestionnaire} onReset={reset} />}
       {view === "admin" && <AdminScreen onExit={() => setView("welcome")} />}
     </main>
   );
 }
 
-function WelcomeScreen({ onStart, onAdmin }: { onStart: () => void; onAdmin: () => void }) {
+function WelcomeScreen({ onBuildLesson, onBuildSelf, onAdmin }: { onBuildLesson: () => void; onBuildSelf: () => void; onAdmin: () => void }) {
   return <section className="welcome-page">
     <div className="welcome-art" aria-hidden="true"><div className="line-art line-one" /><div className="line-art line-two" /><span className="art-dot coral-dot" /><span className="art-dot gold-dot" /><span className="art-star">✦</span></div>
     <div className="welcome-copy">
-      <span className="eyebrow">היי, איזה כיף שבאת!</span>
-      <h1>בואו נגלה<br /><em>מה הופך אותך</em><br />למי שאת/ה.</h1>
-      <p>כמה דקות של שאלות קצרות, שיכולות לספר לך משהו חדש על עצמך.</p>
-      <button className="pill-button primary large" onClick={onStart}>מתחילים <span>←</span></button>
+      <span className="eyebrow">מרחב למידה, יצירה והתפתחות</span>
+      <h1>מה תרצי<br /><em>לבנות היום?</em></h1>
+      <p>כלים חכמים שיעזרו לך לבנות שיעורים טובים יותר — ולבנות את עצמך כמורה.</p>
+      <div className="home-options">
+        <button className="home-option lesson-option" onClick={onBuildLesson}><span className="home-option-icon">▱</span><span><strong>לבנות שיעור</strong><small>מתכנון ראשוני ועד שיעור מוכן</small></span><b>←</b></button>
+        <button className="home-option self-option" onClick={onBuildSelf}><span className="home-option-icon">✦</span><span><strong>לבנות את עצמך</strong><small>להכיר את הסגנון והחוזקות שלך</small></span><b>←</b></button>
+      </div>
       <button className="text-button" onClick={onAdmin}>כניסה למנהלים</button>
     </div>
     <div className="welcome-footer"><span>מרחב בטוח להיכרות עצמית</span><span className="footer-dots">•••</span><span>התשובות שלך נשארות שלך</span></div>
   </section>;
+}
+
+function LessonBuilderScreen({ onBack }: { onBack: () => void }) {
+  return <section className="content-page builder-landing"><button className="back-link" onClick={onBack}>→ חזרה לבחירה</button><div className="page-intro"><span className="eyebrow">לבנות שיעור</span><h1>השיעור שלך<br /><em>מתחיל כאן.</em></h1><p>בקרוב תבני שיעור שלם, מדויק ומותאם לכיתה שלך.</p></div><div className="coming-soon-card lesson-coming"><span className="coming-icon">▱</span><div><h2>בונה השיעורים בדרך</h2><p>נבנה יחד מטרות, רצף פעילות, שאלות טובות ורעיונות שיהפכו את השיעור לחוויה.</p><div className="coming-steps"><span>01 מטרות</span><span>02 פעילות</span><span>03 סיכום</span></div></div><button className="pill-button ghost" onClick={onBack}>בינתיים, לחזור</button></div></section>;
+}
+
+function SelfMenuScreen({ onBack, onTeacherQuiz, onPedagogy }: { onBack: () => void; onTeacherQuiz: () => void; onPedagogy: () => void }) {
+  return <section className="content-page self-menu-page"><button className="back-link" onClick={onBack}>→ חזרה לבית</button><div className="page-intro"><span className="eyebrow">לבנות את עצמך</span><h1>מכירה את עצמך<br /><em>כמורה?</em></h1><p>שתי דרכים להעמיק, לדייק ולצמוח בתוך העשייה שלך.</p></div><div className="self-choice-grid"><button className="self-choice teacher-choice" onClick={onTeacherQuiz}><span className="choice-art">✦</span><span className="choice-tag">מסע אישי</span><h2>המורה שאת</h2><p>שאלון עומק שיעזור לך להבין איזה שיעור נכון לך לבנות, מה להוסיף, ובמה כדאי להתמקד.</p><strong>לצאת למסע <span>←</span></strong></button><button className="self-choice pedagogy-choice" onClick={onPedagogy}><span className="choice-art">◒</span><span className="choice-tag">ארגז כלים</span><h2>פדגוגיה מעשית</h2><p>נושאים, רעיונות ושאלונים קצרים שיעזרו לך להרחיב את המבט הפדגוגי שלך.</p><strong>לגלות כלים <span>←</span></strong></button></div></section>;
+}
+
+function PedagogyScreen({ onBack, onStart }: { onBack: () => void; onStart: () => void }) {
+  return <section className="content-page pedagogy-page"><button className="back-link" onClick={onBack}>→ חזרה לבנות את עצמך</button><div className="page-intro"><span className="eyebrow">פדגוגיה מעשית</span><h1>כלים קטנים,<br /><em>שינוי גדול.</em></h1><p>בחרי נושא שמסקרן אותך. כל שאלון מסתיים בתובנות שאפשר לקחת ישר לכיתה.</p></div><div className="topic-grid"><button className="topic-card intelligence-topic" onClick={onStart}><span className="topic-icon">✦</span><span className="topic-status">שאלון · 5 דקות</span><h2>האינטליגנציות שלי</h2><p>באילו דרכי חשיבה את חזקה? ואילו כדאי לך לטפח?</p><span className="topic-link">מתחילות <b>←</b></span></button><button className="topic-card"><span className="topic-icon">♡</span><span className="topic-status">בקרוב · 7 דקות</span><h2>למידה רגשית־חברתית</h2><p>איך יוצרים מרחב שמאפשר לתלמידים להרגיש, לשאול ולהשתתף?</p><span className="topic-link">לפרטים <b>←</b></span></button><button className="topic-card"><span className="topic-icon">◈</span><span className="topic-status">בקרוב · 6 דקות</span><h2>למידה דיפרנציאלית</h2><p>איך מתכננים שיעור שנותן מקום לקצב ולסגנון של כל תלמידה?</p><span className="topic-link">לפרטים <b>←</b></span></button><button className="topic-card"><span className="topic-icon">↗</span><span className="topic-status">בקרוב · 4 דקות</span><h2>הערכה שמקדמת למידה</h2><p>להפוך משוב לכלי שמניע סקרנות, התנסות והתקדמות.</p><span className="topic-link">לפרטים <b>←</b></span></button></div></section>;
 }
 
 function LibraryScreen({ onStart }: { onStart: () => void }) {
@@ -107,7 +127,7 @@ function LibraryScreen({ onStart }: { onStart: () => void }) {
   </section>;
 }
 
-function QuizScreen({ question, step, total, activeSection, answer, error, onChoose, onNext }: { question: (typeof questionnaire.questions)[number]; step: number; total: number; activeSection: string; answer?: number; error: string; onChoose: (value: number) => void; onNext: () => void }) {
+function QuizScreen({ question, step, total, activeSection, answer, error, onChoose, onNext }: { question: Questionnaire["questions"][number]; step: number; total: number; activeSection: string; answer?: number; error: string; onChoose: (value: number) => void; onNext: () => void }) {
   return <section className="quiz-page">
     <div className="quiz-top"><div><span className="eyebrow">{activeSection}</span><div className="question-count">שאלה {String(step + 1).padStart(2, "0")} <span>מתוך {String(total).padStart(2, "0")}</span></div></div><div className="progress-ring" style={{ background: `conic-gradient(var(--coral) 0 ${((step + 1) / total) * 100}%, #dce8f1 ${((step + 1) / total) * 100}% 100%)` }}><span>{Math.round(((step + 1) / total) * 100)}%</span></div></div>
     <div className="progress-bar"><span style={{ width: `${((step + 1) / total) * 100}%` }} /></div>
@@ -119,9 +139,18 @@ function QuizScreen({ question, step, total, activeSection, answer, error, onCho
   </section>;
 }
 
-function ResultsScreen({ results, onReset }: { results: Result[]; onReset: () => void }) {
-  return <section className="results-page"><div className="results-heading"><div className="result-badge">✦</div><span className="eyebrow">המסע שלך הושלם</span><h1>יש לך מצפן<br /><em>ממש מיוחד.</em></h1><p>הנה כמה דברים שגילינו על הדרך שבה את/ה פועל/ת בעולם.</p></div>
-    <div className="results-grid">{results.map((result) => { const dimension = questionnaire.dimensions.find((item) => item.id === result.dimensionId)!; return <article className={`score-card ${dimension.color}`} key={result.dimensionId}><div className="score-icon">{dimension.icon}</div><div><span className="score-label">{result.band}</span><h2>{dimension.name}</h2><p>{dimension.description}</p></div><div className="score-meter"><div className="meter-track"><span style={{ width: `${result.score}%` }} /></div><strong>{result.score}<small>/100</small></strong></div></article>; })}</div>
+function ResultsScreen({ results, activeQuestionnaire, onReset }: { results: Result[]; activeQuestionnaire: Questionnaire; onReset: () => void }) {
+  const isIntelligence = activeQuestionnaire.id === intelligenceQuestionnaire.id;
+  const sortedResults = [...results].sort((a, b) => b.score - a.score);
+  const topScore = sortedResults[0]?.score ?? 0;
+  const groups = isIntelligence ? [
+    { key: "strong", title: "בולטות במיוחד", description: "הכוחות שקל לך להביא איתך לכיתה וללמידה.", results: sortedResults.filter((result) => result.score >= topScore - 7) },
+    { key: "developing", title: "חוזקות משמעותיות", description: "יכולות שיש להן מקום טוב אצלך, ואפשר להמשיך להרחיב.", results: sortedResults.filter((result) => result.score < topScore - 7 && result.score >= 45) },
+    { key: "growth", title: "כיוונים לפיתוח", description: "הזדמנויות להתנסות בדרך חדשה — לא חולשות, אלא אפשרויות.", results: sortedResults.filter((result) => result.score < 45) }
+  ].filter((group) => group.results.length > 0) : [];
+  const scoreCard = (result: Result) => { const dimension = activeQuestionnaire.dimensions.find((item) => item.id === result.dimensionId)!; return <article className={`score-card ${dimension.color}`} key={result.dimensionId}><div className="score-icon">{dimension.icon}</div><div><span className="score-label">{result.band}</span><h2>{dimension.name}</h2><p>{dimension.description}</p></div><div className="score-meter"><div className="meter-track"><span style={{ width: `${result.score}%` }} /></div><strong>{result.score}<small>/100</small></strong></div></article>; };
+  return <section className="results-page"><div className="results-heading"><div className="result-badge">✦</div><span className="eyebrow">{isIntelligence ? "המפה הפדגוגית שלך" : "המסע שלך הושלם"}</span><h1>{isIntelligence ? <>החשיבה שלך<br /><em>מגוונת ועשירה.</em></> : <>יש לך מצפן<br /><em>ממש מיוחד.</em></>}</h1><p>{isIntelligence ? "אין אינטליגנציה אחת טובה מאחרת. לכן חילקנו את התוצאה לכמה רמות חוזק, כדי שתראי את התמונה המלאה שלך." : "הנה כמה דברים שגילינו על הדרך שבה את/ה פועל/ת בעולם."}</p></div>
+    {isIntelligence ? <div className="result-groups">{groups.map((group) => <section className={`result-group ${group.key}`} key={group.key}><div className="result-group-heading"><div><span className="group-kicker">{group.results.length} {group.results.length === 1 ? "תחום" : "תחומים"}</span><h2>{group.title}</h2><p>{group.description}</p></div><span className="group-rule" /></div><div className="results-grid">{group.results.map(scoreCard)}</div></section>)}</div> : <div className="results-grid">{results.map(scoreCard)}</div>}
     <div className="results-actions"><button className="pill-button primary large" onClick={onReset}>חזרה לבית <span>←</span></button><button className="text-button" onClick={onReset}>לשמור על פרטיות ולצאת</button></div>
   </section>;
 }

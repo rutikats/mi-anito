@@ -105,4 +105,73 @@ export const questionnaire = {
   ] satisfies ScoringRule[]
 };
 
-export type Questionnaire = typeof questionnaire;
+export type Questionnaire = {
+  id: string;
+  title: string;
+  category: string;
+  estimatedMinutes: number;
+  version: number;
+  sections: { id: string; title: string }[];
+  questions: Question[];
+  dimensions: Dimension[];
+  scoringRules: ScoringRule[];
+};
+
+const intelligenceOptions = [
+  { id: "int-1", label: "בכלל לא נכון", value: 1 },
+  { id: "int-2", label: "מעט נכון", value: 2 },
+  { id: "int-3", label: "לפעמים נכון", value: 3 },
+  { id: "int-4", label: "די נכון", value: 4 },
+  { id: "int-5", label: "מאוד נכון", value: 5 }
+];
+
+const intelligenceDimensions: Dimension[] = [
+  { id: "linguistic", name: "מילולית", color: "coral", icon: "Aa", description: "היכולת שלך לשחק עם מילים, להסביר רעיונות ולספר סיפור." },
+  { id: "logical", name: "לוגית־מתמטית", color: "blue", icon: "∑", description: "הדרך שבה את מזהה דפוסים, מנתחת ומחפשת פתרונות." },
+  { id: "visual", name: "מרחבית־חזותית", color: "mint", icon: "◇", description: "היכולת שלך לחשוב בתמונות, צורות, צבעים ומרחב." },
+  { id: "musical", name: "מוזיקלית", color: "gold", icon: "♫", description: "הרגישות שלך לקצב, צליל, מנגינה והבעה דרך מוזיקה." },
+  { id: "bodily", name: "גופנית־תנועתית", color: "coral", icon: "↗", description: "הדרך שבה הגוף, התנועה והעשייה עוזרים לך ללמוד." },
+  { id: "interpersonal", name: "בין־אישית", color: "blue", icon: "♡", description: "היכולת שלך להבין אנשים, לשתף פעולה ולבנות קשר." },
+  { id: "intrapersonal", name: "תוך־אישית", color: "mint", icon: "◉", description: "היכולת שלך להכיר את עצמך, להקשיב פנימה ולכוון את עצמך." },
+  { id: "naturalistic", name: "טבעית", color: "gold", icon: "✿", description: "החיבור שלך לטבע, לסביבה ולזיהוי תופעות בעולם." }
+];
+
+const intelligencePrompts: Record<string, { dimensionId: string; prompts: string[] }> = {
+  linguistic: { dimensionId: "linguistic", prompts: ["אני נהנית לקרוא, לכתוב או לספר סיפורים.", "קל לי להסביר רעיון מורכב במילים פשוטות."] },
+  logical: { dimensionId: "logical", prompts: ["אני אוהבת לחפש דפוסים, סדר והיגיון בדברים.", "כשיש בעיה, אני מפרקת אותה לחלקים ומחפשת פתרון."] },
+  visual: { dimensionId: "visual", prompts: ["אני זוכרת דברים טוב יותר כשאני רואה אותם בתמונה או בתרשים.", "קל לי לדמיין איך דברים נראים או מסודרים במרחב."] },
+  musical: { dimensionId: "musical", prompts: ["אני שמה לב למנגינות, מקצבים וצלילים סביבי.", "מוזיקה עוזרת לי לזכור, להתרכז או לבטא את עצמי."] },
+  bodily: { dimensionId: "bodily", prompts: ["אני מבינה דברים טוב יותר כשאני מתנסה או עושה בעצמי.", "תנועה, משחק או שימוש בידיים עוזרים לי לחשוב."] },
+  interpersonal: { dimensionId: "interpersonal", prompts: ["אני קולטת בקלות מה אנשים אחרים מרגישים או צריכים.", "אני נהנית ללמוד יחד, להקשיב ולבנות רעיון עם אחרים."] },
+  intrapersonal: { dimensionId: "intrapersonal", prompts: ["אני יודעת לזהות מה אני מרגישה ומה עוזר לי להתקדם.", "אני אוהבת לעצור, לחשוב על חוויה ולהפיק ממנה תובנה."] },
+  naturalistic: { dimensionId: "naturalistic", prompts: ["אני סקרנית לגבי הטבע, בעלי חיים ותופעות בסביבה.", "אני שמה לב להבדלים, למיון ולקשרים בין דברים בעולם."] }
+};
+
+const intelligenceQuestions: Question[] = Object.entries(intelligencePrompts).flatMap(([key, item], index) =>
+  item.prompts.map((prompt, promptIndex) => ({
+    id: `int-${index + 1}-${promptIndex + 1}`,
+    sectionId: index < 4 ? "ways-of-thinking" : "ways-of-connecting",
+    type: "likert" as const,
+    prompt,
+    required: true,
+    options: intelligenceOptions.map((option) => ({ ...option, id: `${key}-${option.id}` }))
+  }))
+);
+
+export const intelligenceQuestionnaire: Questionnaire = {
+  id: "intelligences",
+  title: "האינטליגנציות שלי",
+  category: "פדגוגיה מעשית",
+  estimatedMinutes: 7,
+  version: 1,
+  sections: [
+    { id: "ways-of-thinking", title: "איך אני חושבת ולומדת?" },
+    { id: "ways-of-connecting", title: "איך אני מחוברת לעולם?" }
+  ],
+  questions: intelligenceQuestions,
+  dimensions: intelligenceDimensions,
+  scoringRules: intelligenceQuestions.map((question) => {
+    const dimensionIndex = Number(question.id.split("-")[1]) - 1;
+    return { questionId: question.id, dimensionId: Object.values(intelligencePrompts)[dimensionIndex].dimensionId, weight: 1, reverseScored: false };
+  })
+};

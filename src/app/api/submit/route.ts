@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
-import { questionnaire } from "@/lib/questionnaire";
+import { intelligenceQuestionnaire, questionnaire, type Questionnaire } from "@/lib/questionnaire";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { answers?: Record<string, number> };
+  const body = (await request.json()) as { answers?: Record<string, number>; questionnaireId?: string };
+  const selectedQuestionnaire: Questionnaire = body.questionnaireId === intelligenceQuestionnaire.id ? intelligenceQuestionnaire : questionnaire;
   const answers = body.answers ?? {};
-  const missing = questionnaire.questions.filter((question) => question.required && typeof answers[question.id] !== "number");
+  const missing = selectedQuestionnaire.questions.filter((question) => question.required && typeof answers[question.id] !== "number");
 
   if (missing.length > 0) {
     return NextResponse.json({ error: "יש שאלות שעדיין מחכות לתשובה.", missing: missing.map((question) => question.id) }, { status: 400 });
   }
 
-  const results = questionnaire.dimensions.map((dimension) => {
-    const rules = questionnaire.scoringRules.filter((rule) => rule.dimensionId === dimension.id);
+  const results = selectedQuestionnaire.dimensions.map((dimension) => {
+    const rules = selectedQuestionnaire.scoringRules.filter((rule) => rule.dimensionId === dimension.id);
     const weightedTotal = rules.reduce((sum, rule) => {
       const value = answers[rule.questionId];
       const normalized = rule.reverseScored ? 6 - value : value;
