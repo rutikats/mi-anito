@@ -77,7 +77,7 @@ export default function Home() {
       {view === "self-menu" && <SelfMenuScreen onBack={() => setView("welcome")} onTeacherQuiz={() => { setActiveQuestionnaire(questionnaire); setAnswers({}); setStep(0); setView("quiz"); }} onPedagogy={() => setView("pedagogy")} />}
       {view === "pedagogy" && <PedagogyScreen onBack={() => setView("self-menu")} onStart={() => { setActiveQuestionnaire(intelligenceQuestionnaire); setAnswers({}); setStep(0); setView("quiz"); }} />}
       {view === "library" && <LibraryScreen onStart={() => { setActiveQuestionnaire(questionnaire); setAnswers({}); setStep(0); setView("quiz"); }} />}
-      {view === "quiz" && <QuizScreen question={question} step={step} total={activeQuestionnaire.questions.length} activeSection={activeSection?.title ?? ""} answer={answers[question.id]} error={error} onChoose={choose} onNext={next} />}
+      {view === "quiz" && <QuizScreen question={question} step={step} total={activeQuestionnaire.questions.length} activeSection={activeSection?.title ?? ""} answer={answers[question.id]} error={error} onChoose={choose} onBack={() => { if (step > 0) { setStep((current) => current - 1); setError(""); } }} onNext={next} />}
       {view === "results" && <ResultsScreen results={results} activeQuestionnaire={activeQuestionnaire} onReset={reset} />}
       {view === "admin" && <AdminScreen onExit={() => setView("welcome")} />}
     </main>
@@ -127,7 +127,7 @@ function LibraryScreen({ onStart }: { onStart: () => void }) {
   </section>;
 }
 
-function QuizScreen({ question, step, total, activeSection, answer, error, onChoose, onNext }: { question: Questionnaire["questions"][number]; step: number; total: number; activeSection: string; answer?: number; error: string; onChoose: (value: number) => void; onNext: () => void }) {
+function QuizScreen({ question, step, total, activeSection, answer, error, onChoose, onBack, onNext }: { question: Questionnaire["questions"][number]; step: number; total: number; activeSection: string; answer?: number; error: string; onChoose: (value: number) => void; onBack: () => void; onNext: () => void }) {
   return <section className="quiz-page">
     <div className="quiz-top"><div><span className="eyebrow">{activeSection}</span><div className="question-count">שאלה {String(step + 1).padStart(2, "0")} <span>מתוך {String(total).padStart(2, "0")}</span></div></div><div className="progress-ring" style={{ background: `conic-gradient(var(--coral) 0 ${((step + 1) / total) * 100}%, #dce8f1 ${((step + 1) / total) * 100}% 100%)` }}><span>{Math.round(((step + 1) / total) * 100)}%</span></div></div>
     <div className="progress-bar"><span style={{ width: `${((step + 1) / total) * 100}%` }} /></div>
@@ -135,7 +135,7 @@ function QuizScreen({ question, step, total, activeSection, answer, error, onCho
       <div className="answer-scale">{question.options.map((option) => <button key={option.id} className={`answer-option ${answer === option.value ? "selected" : ""}`} onClick={() => onChoose(option.value)}><span className="answer-number">{option.value}</span><span>{option.label}</span></button>)}</div>
       {error && <p className="error-message">{error}</p>}
     </div>
-    <div className="quiz-footer"><button className="pill-button primary large next-button" onClick={onNext}>{step === total - 1 ? "מסיימים" : "המשך"} <span>←</span></button><span className="keyboard-hint">אפשר לשנות תשובה בכל שלב</span></div>
+    <div className="quiz-footer"><button className="pill-button back-button" onClick={onBack} disabled={step === 0}>→ חזרה</button><span className="keyboard-hint">אפשר לשנות תשובה בכל שלב</span><button className="pill-button primary large next-button" onClick={onNext}>{step === total - 1 ? "מסיימים" : "המשך"} <span>←</span></button></div>
   </section>;
 }
 
